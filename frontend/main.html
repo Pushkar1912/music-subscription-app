@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Subscription — Main</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- HEADER -->
+    <header class="main-header">
+        <div class="header-left">
+            <h1>Music Subscription</h1>
+        </div>
+        <div class="header-right">
+            <span class="user-area">Welcome, <strong id="user-name"></strong></span>
+            <a href="#" id="logout-link" class="btn btn-logout">Logout</a>
+            <div class="backend-selector-inline">
+                <select id="backend-select">
+                    <option value="ec2">EC2</option>
+                    <option value="ecs">ECS</option>
+                    <option value="lambda" selected>API Gateway + Lambda</option>
+                </select>
+            </div>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <!-- SUBSCRIPTION AREA -->
+        <section class="panel subscription-panel">
+            <h2>My Subscriptions</h2>
+            <div id="subscriptions-area">
+                <p class="empty-state" id="no-subs-msg">You have no subscriptions yet.</p>
+            </div>
+        </section>
+
+        <!-- QUERY AREA -->
+        <section class="panel query-panel">
+            <h2>Search Music</h2>
+            <form id="query-form">
+                <div class="query-fields">
+                    <div class="form-group">
+                        <label for="q-title">Title</label>
+                        <input type="text" id="q-title" placeholder="Song title">
+                    </div>
+                    <div class="form-group">
+                        <label for="q-artist">Artist</label>
+                        <input type="text" id="q-artist" placeholder="Artist name">
+                    </div>
+                    <div class="form-group">
+                        <label for="q-year">Year</label>
+                        <input type="text" id="q-year" placeholder="Year">
+                    </div>
+                    <div class="form-group">
+                        <label for="q-album">Album</label>
+                        <input type="text" id="q-album" placeholder="Album name">
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Query</button>
+            </form>
+
+            <div id="query-error" class="error-msg" style="display:none;"></div>
+            <div id="query-results"></div>
+        </section>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        (function () {
+            const email = sessionStorage.getItem("email");
+            const userName = sessionStorage.getItem("user_name");
+
+            if (!email) {
+                window.location.href = "index.html";
+                return;
+            }
+
+            document.getElementById("user-name").textContent = userName || email;
+
+            loadSubscriptions();
+
+            document.getElementById("logout-link").addEventListener("click", (e) => {
+                e.preventDefault();
+                sessionStorage.clear();
+                window.location.href = "index.html";
+            });
+
+            document.getElementById("query-form").addEventListener("submit", async (e) => {
+                e.preventDefault();
+                const title = document.getElementById("q-title").value.trim();
+                const artist = document.getElementById("q-artist").value.trim();
+                const year = document.getElementById("q-year").value.trim();
+                const album = document.getElementById("q-album").value.trim();
+                const errorDiv = document.getElementById("query-error");
+                const resultsDiv = document.getElementById("query-results");
+
+                errorDiv.style.display = "none";
+                resultsDiv.innerHTML = "";
+
+                if (!title && !artist && !year && !album) {
+                    errorDiv.textContent = "At least one field must be completed.";
+                    errorDiv.style.display = "block";
+                    return;
+                }
+
+                try {
+                    const params = new URLSearchParams();
+                    if (title) params.append("title", title);
+                    if (artist) params.append("artist", artist);
+                    if (year) params.append("year", year);
+                    if (album) params.append("album", album);
+
+                    const resp = await apiCall(`/music?${params.toString()}`, "GET");
+
+                    if (resp.message && (!resp.results || resp.results.length === 0)) {
+                        errorDiv.textContent = resp.message;
+                        errorDiv.style.display = "block";
+                        return;
+                    }
+
+                    if (resp.results && resp.results.length > 0) {
+                        resp.results.forEach((song) => {
+                            resultsDiv.appendChild(createSongCard(song, "subscribe"));
+                        });
+                    }
+                } catch (err) {
+                    errorDiv.textContent = "Query failed. Please try again.";
+                    errorDiv.style.display = "block";
+                }
+            });
+        })();
+
+        async function loadSubscriptions() {
+            const email = sessionStorage.getItem("email");
+            const subsArea = document.getElementById("subscriptions-area");
+            const noSubsMsg = document.getElementById("no-subs-msg");
+
+            try {
+                const resp = await apiCall(`/subscriptions?email=${encodeURIComponent(email)}`, "GET");
+                const subs = resp.subscriptions || [];
+
+                subsArea.innerHTML = "";
+
+                if (subs.length === 0) {
+                    const p = document.createElement("p");
+                    p.className = "empty-state";
+                    p.id = "no-subs-msg";
+                    p.textContent = "You have no subscriptions yet.";
+                    subsArea.appendChild(p);
+                    return;
+                }
+
+                subs.forEach((song) => {
+                    subsArea.appendChild(createSongCard(song, "remove"));
+                });
+            } catch (err) {
+                console.error("Failed to load subscriptions:", err);
+            }
+        }
+
+        function createSongCard(song, actionType) {
+            const card = document.createElement("div");
+            card.className = "song-card";
+
+            const img = document.createElement("img");
+            img.src = song.image_url || "";
+            img.alt = song.artist || "Artist";
+            img.className = "artist-img";
+            img.onerror = function () { this.style.display = "none"; };
+
+            const info = document.createElement("div");
+            info.className = "song-info";
+            info.innerHTML = `
+                <p class="song-title">${escapeHtml(song.title || "")}</p>
+                <p class="song-detail">Artist: ${escapeHtml(song.artist || "")}</p>
+                <p class="song-detail">Year: ${escapeHtml(song.year || "")}</p>
+                <p class="song-detail">Album: ${escapeHtml(song.album || "")}</p>
+            `;
+
+            const btn = document.createElement("button");
+
+            if (actionType === "subscribe") {
+                btn.className = "btn btn-subscribe";
+                btn.textContent = "Subscribe";
+                btn.addEventListener("click", () => subscribeSong(song, card));
+            } else {
+                btn.className = "btn btn-remove";
+                btn.textContent = "Remove";
+                btn.addEventListener("click", () => removeSong(song, card));
+            }
+
+            card.appendChild(img);
+            card.appendChild(info);
+            card.appendChild(btn);
+            return card;
+        }
+
+        async function subscribeSong(song, card) {
+            const email = sessionStorage.getItem("email");
+            try {
+                await apiCall("/subscriptions", "POST", {
+                    email: email,
+                    title: song.title,
+                    artist: song.artist,
+                    year: song.year,
+                    album: song.album,
+                    image_url: song.image_url,
+                });
+                loadSubscriptions();
+                card.querySelector(".btn-subscribe").textContent = "Subscribed";
+                card.querySelector(".btn-subscribe").disabled = true;
+            } catch (err) {
+                alert("Failed to subscribe.");
+            }
+        }
+
+        async function removeSong(song, card) {
+            const email = sessionStorage.getItem("email");
+            try {
+                await apiCall("/subscriptions", "DELETE", {
+                    email: email,
+                    title: song.title,
+                    artist: song.artist,
+                    year: song.year,
+                });
+                card.remove();
+                const subsArea = document.getElementById("subscriptions-area");
+                if (subsArea.children.length === 0) {
+                    const p = document.createElement("p");
+                    p.className = "empty-state";
+                    p.id = "no-subs-msg";
+                    p.textContent = "You have no subscriptions yet.";
+                    subsArea.appendChild(p);
+                }
+            } catch (err) {
+                alert("Failed to remove subscription.");
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement("div");
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

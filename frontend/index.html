@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login — Music Subscription</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-card">
+            <h1>Music Subscription</h1>
+            <h2>Login</h2>
+
+            <div id="error-msg" class="error-msg" style="display:none;"></div>
+
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" placeholder="Enter your email" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" placeholder="Enter your password" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Login</button>
+            </form>
+
+            <p class="auth-link">Don't have an account? <a href="register.html">Register here</a></p>
+
+            <div class="backend-selector">
+                <label for="backend-select">Backend:</label>
+                <select id="backend-select">
+                    <option value="ec2">EC2</option>
+                    <option value="ecs">ECS</option>
+                    <option value="lambda" selected>API Gateway + Lambda</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        document.getElementById("login-form").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const email = document.getElementById("email").value.trim();
+            const password = document.getElementById("password").value.trim();
+            const errorDiv = document.getElementById("error-msg");
+            errorDiv.style.display = "none";
+
+            try {
+                const resp = await apiCall("/login", "POST", { email, password });
+
+                if (resp.error) {
+                    errorDiv.textContent = resp.error;
+                    errorDiv.style.display = "block";
+                    return;
+                }
+
+                sessionStorage.setItem("email", resp.email);
+                sessionStorage.setItem("user_name", resp.user_name);
+                window.location.href = "main.html";
+            } catch (err) {
+                errorDiv.textContent = "email or password is invalid";
+                errorDiv.style.display = "block";
+            }
+        });
+
+        if (sessionStorage.getItem("email")) {
+            window.location.href = "main.html";
+        }
+    </script>
+</body>
+</html>
