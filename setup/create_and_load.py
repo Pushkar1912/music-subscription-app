@@ -88,15 +88,15 @@ def load_login_data():
     """
     Load sample login entries into the login table.
     Pattern: email = s4xxxxxxx@student.rmit.edu.au (student ID anonymized),
-    user_name = FirstnameLastname + digit, password rotates for demo purposes.
+    user_name = placeholder username, password rotates for demo purposes.
     """
     print("Loading login data...")
     table = dynamodb.Table("login")
 
     login_data = [
-        {"email": "s4xxxxxx0@student.rmit.edu.au", "user_name": "PushkarAwate0", "password": "012345"},
-        {"email": "s4xxxxxx4@student.rmit.edu.au", "user_name": "PushkarAwate4", "password": "456789"},
-        {"email": "s4xxxxxx8@student.rmit.edu.au", "user_name": "PushkarAwate8", "password": "890123"},
+        {"email": "s4xxxxxx0@student.rmit.edu.au", "user_name": "Username1", "password": "012345"},
+        {"email": "s4xxxxxx4@student.rmit.edu.au", "user_name": "Username2", "password": "456789"},
+        {"email": "s4xxxxxx8@student.rmit.edu.au", "user_name": "Username3", "password": "890123"},
     ]
 
     with table.batch_writer() as batch:
